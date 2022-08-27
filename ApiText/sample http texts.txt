@@ -1,0 +1,29 @@
+GET /api/products
+:scheme: https
+accept: application/json, 
+accept-language: en-US,en
+referer: https://localhost:5471
+user-agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Edge/18.18362 Safari/537.36
+
+200 OK
+content-type: application/json;
+content-length: xxxx
+
+[{"name":"Chocolate","imageUrl":"../assets/chocolate.webp","unitOfMeasures":[{"name":"Pair","singlesPerUnit":2},{"name":"Pack","singlesPerUnit":5},{"name":"Dozen","singlesPerUnit":12}]},{"name":"Cola","imageUrl":"../assets/cola.jpg","unitOfMeasures":[{"name":"Each","singlesPerUnit":1},{"name":"Pack","singlesPerUnit":6},{"name":"Case","singlesPerUnit":24}]}]
+
+
+
+
+POST /api/reduce
+:scheme: https
+content-type: application/json,
+Content-Length: xxx
+
+[{"name":"Cola","unitOfMeasureName":"PACK","quantity":1},{"name":"Cola","unitOfMeasureName":"EACH","quantity":62}]
+
+
+Date: Sat, 27 Aug 2022 05:13:22 GMT
+Content-Type: application/json
+Content-Length: xxx
+
+[{"name":"Cola","unitOfMeasureName":"PACK","quantity":3},{"name":"Cola","unitOfMeasureName":"EACH","quantity":2},{"name":"Cola","unitOfMeasureName":"CASE","quantity":2}]
