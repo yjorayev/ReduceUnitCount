@@ -5,8 +5,8 @@
         public static Task<List<OrderItem>> ReduceUnitsAsync(IEnumerable<OrderItem> items, IProductStore store)
         {
             var tasks = items
-                .GroupBy(item => item.ProductName)
-                .Select(group => ReduceUnitsForProductAsync(group, group.Key, store));
+            .GroupBy(item => item.ProductName)
+            .Select(group => ReduceUnitsForProductAsync(group, group.Key, store));
 
             return Task
                 .WhenAll(tasks)
@@ -17,21 +17,31 @@
         {
             return store
                 .GetUnitsForProductAsync(productName)
-                .ContinueWith(task => ReduceUnitsForProduct(items, productName, task.Result));
+                .ContinueWith(task => ReduceUnitsForProductBottomUp(items, productName, task.Result));
         }
 
-        private static List<OrderItem> ReduceUnitsForProduct(IEnumerable<OrderItem> items, string productName, IEnumerable<UnitOfMeasure> unitOfMeasures)
+        private static List<OrderItem> ReduceUnitsForProductRecursive(IEnumerable<OrderItem> items, string productName, IEnumerable<UnitOfMeasure> unitOfMeasures)
         {
             var uOM = unitOfMeasures.ToDictionary(unitOfMeasure => unitOfMeasure.Name);
             var total = items.Sum(item => item.Quantity * uOM[item.UnitOfMeasure].SinglesPerUnit);
 
             var memo = new Dictionary<int, IDictionary<string, OrderItem>?>();
-            return ReduceUnitsInternal(total, productName, unitOfMeasures, memo)!
+            return ReduceUnitsInternalRecursive(total, productName, unitOfMeasures, memo)!
                 .Values
                 .ToList();
         }
 
-        private static IDictionary<string, OrderItem>? ReduceUnitsInternal(int totalCount, string productName, IEnumerable<UnitOfMeasure> unitOfMeasures, Dictionary<int, IDictionary<string, OrderItem>?> memo)
+        private static List<OrderItem> ReduceUnitsForProductBottomUp(IEnumerable<OrderItem> items, string productName, IEnumerable<UnitOfMeasure> unitOfMeasures)
+        {
+            var uOM = unitOfMeasures.ToDictionary(unitOfMeasure => unitOfMeasure.Name);
+            var total = items.Sum(item => item.Quantity * uOM[item.UnitOfMeasure].SinglesPerUnit);
+
+            return ReduceUnitsInternalBottomUp(total, productName, unitOfMeasures)!
+                .Values
+                .ToList();
+        }
+
+        private static IDictionary<string, OrderItem>? ReduceUnitsInternalRecursive(int totalCount, string productName, IEnumerable<UnitOfMeasure> unitOfMeasures, Dictionary<int, IDictionary<string, OrderItem>?> memo)
         {
             if (totalCount == 0)
                 return new Dictionary<string, OrderItem>();
@@ -46,7 +56,7 @@
             {
                 if (unitOfMeasure.SinglesPerUnit <= totalCount)
                 {
-                    var temp = ReduceUnitsInternal(totalCount - unitOfMeasure.SinglesPerUnit, productName, unitOfMeasures, memo);
+                    var temp = ReduceUnitsInternalRecursive(totalCount - unitOfMeasure.SinglesPerUnit, productName, unitOfMeasures, memo);
                     if (temp == null)
                         continue;
 
@@ -71,6 +81,46 @@
 
             memo[totalCount] = currMin == null ? null : new Dictionary<string, OrderItem>(currMin);
             return currMin;
+        }
+
+        private static Dictionary<string, OrderItem> ReduceUnitsInternalBottomUp(int totalCount, string productName, IEnumerable<UnitOfMeasure> unitOfMeasures)
+        {
+            var result = new Dictionary<string, OrderItem>[totalCount + 1];
+            result[0] = new Dictionary<string, OrderItem>();
+
+            for (int i = 1; i <= totalCount; i++)
+            {
+                foreach (var unitOfMeasure in unitOfMeasures)
+                {
+                    if (unitOfMeasure.SinglesPerUnit <= i) 
+                    {
+                        var currMin = result[i - unitOfMeasure.SinglesPerUnit];
+
+                        if(currMin != null && TotalCount(currMin)+1 < TotalCount(result[i]))
+                        {
+                            result[i] = new Dictionary<string, OrderItem>(currMin);
+                            if(currMin != null && currMin.TryGetValue(unitOfMeasure.Name, out var item))
+                            {
+                                result[i][unitOfMeasure.Name] = item with { Quantity = item.Quantity + 1 };
+                            }
+                            else
+                            {
+                                result[i][unitOfMeasure.Name] = new OrderItem(productName, unitOfMeasure.Name, 1);
+                            }
+                        }
+                    }
+                }
+            }
+
+            return result[totalCount];
+        }
+
+        private static int TotalCount(Dictionary<string, OrderItem> items)
+        {
+            if (items == null)
+                return int.MaxValue;
+
+            return items.Values.Sum(item => item.Quantity);
         }
     }
 }
